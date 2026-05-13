@@ -106,7 +106,7 @@ def run_test(stdscr, server_ip):
         final_stats = {"down_speed": down_speed, "latency": avg_lat, "jitter": jitter}
         sock.sendall(json.dumps(final_stats).ljust(256).encode())
 
-        stdscr.addstr(18, 4, "TEST SUCCESSFUL. Press any key.", curses.color_pair(2) | curses.A_BOLD)
+        stdscr.addstr(18, 4, "TEST SUCCESSFUL. Press any key to exit.", curses.color_pair(2) | curses.A_BOLD)
         stdscr.getch()
 
     except Exception as e:
