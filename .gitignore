@@ -1,0 +1,18 @@
+# Python bytecode (prevents those annoying __pycache__ folders)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments (If you ever create a virtual environment)
+venv/
+.venv/
+env/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Project-specific 
+*.log
+speedtestClient.py.old
