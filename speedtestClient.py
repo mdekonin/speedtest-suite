@@ -17,19 +17,32 @@ def recv_exactly(sock, n):
     return data
 
 def run_test(stdscr, server_ip):
-    curses.start_color()
-    curses.init_pair(1, curses.COLOR_CYAN, -1)
-    curses.init_pair(2, curses.COLOR_GREEN, -1)
+    # --- Robust Curses Initialization ---
+    try:
+        curses.start_color()
+        curses.use_default_colors() # Required to use -1 as a color value
+        # Initialize pairs safely
+        curses.init_pair(1, curses.COLOR_CYAN, -1)
+        curses.init_pair(2, curses.COLOR_GREEN, -1)
+    except curses.error:
+        # Fallback if the terminal doesn't support transparency (-1)
+        curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    
+    curses.curs_set(0)
+    stdscr.clear()
     
     def draw(row, title, msg, progress=0):
-        stdscr.addstr(row, 4, f"[{title}]", curses.color_pair(1) | curses.A_BOLD)
-        stdscr.addstr(row + 1, 6, f"{msg.ljust(50)}")
-        if progress > 0:
-            bar = "#" * int(progress / 6.25)
-            stdscr.addstr(row + 2, 6, f"[{bar.ljust(16)}] {int(progress)}%")
-        stdscr.refresh()
+        try:
+            stdscr.addstr(row, 4, f"[{title}]", curses.color_pair(1) | curses.A_BOLD)
+            stdscr.addstr(row + 1, 6, f"{msg.ljust(50)}")
+            if progress > 0:
+                bar = "#" * int(progress / 6.25)
+                stdscr.addstr(row + 2, 6, f"[{bar.ljust(16)}] {int(progress)}%")
+            stdscr.refresh()
+        except curses.error:
+            pass # Prevent crash if window is resized too small
 
-    stdscr.clear()
     stdscr.addstr(1, 2, f" PROTOCOL-DRIVEN SPEEDTEST ", curses.A_REVERSE)
 
     try:
@@ -43,16 +56,18 @@ def run_test(stdscr, server_ip):
 
         # 2. GET MANIFEST
         manifest_raw = recv_exactly(sock, 256)
+        if not manifest_raw: raise Exception("Server closed connection during handshake")
         manifest = json.loads(manifest_raw.decode().strip())
         UP_LEN, DOWN_LEN, BLOCK = manifest['up_len'], manifest['down_len'], manifest['block']
 
         # 3. PHASE 1: UPLOAD
         payload = b"X" * BLOCK
         start_t = time.time()
-        for i in range(UP_LEN // BLOCK):
+        num_up_chunks = UP_LEN // BLOCK
+        for i in range(num_up_chunks):
             sock.sendall(payload)
             if i % 200 == 0:
-                draw(6, "UPLOAD", "Transferring...", (i * BLOCK / UP_LEN) * 100)
+                draw(6, "UPLOAD", "Transferring...", (i / num_up_chunks) * 100)
         up_speed = (UP_LEN * 8) / ((time.time() - start_t) * 1_000_000)
         draw(6, "UPLOAD", f"Complete: {up_speed:.2f} Mbps", 100)
 
@@ -96,6 +111,8 @@ def run_test(stdscr, server_ip):
 
     except Exception as e:
         stdscr.addstr(20, 4, f"FATAL ERROR: {e}", curses.A_BOLD)
+        stdscr.refresh()
+        time.sleep(2) # Give user time to see error
         stdscr.getch()
     finally:
         sock.close()
